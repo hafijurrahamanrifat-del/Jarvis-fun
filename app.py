@@ -85,7 +85,6 @@ def keys_from(value):
     return [x.strip() for x in str(value or "").replace(",", "\n").splitlines() if x.strip()]
 
 def safe_error(exc):
-    # Do not expose request headers, credentials, or raw provider response bodies.
     return f"{type(exc).__name__}: {str(exc)[:240]}"
 
 def chat_history():
@@ -143,7 +142,6 @@ def openai_compatible(provider, key, model, messages):
     return data["choices"][0]["message"]["content"]
 
 def gemini_call(key, model, messages, image_parts=None):
-    # Stable Gemini REST generateContent interface; avoids legacy SDK coupling.
     contents = []
     for m in messages:
         if m["role"] == "system":
@@ -252,7 +250,6 @@ def get_transcript(video_id):
                 return txt
         except Exception as e:
             errors.append(safe_error(e))
-    # Apify is optional. Actor slug is configurable because actor APIs vary.
     token = str(secret("APIFY_TOKEN", "")).strip()
     actor = str(secret("APIFY_YOUTUBE_ACTOR", "streamers/youtube-transcripts-scraper")).strip()
     if token and actor:
@@ -291,7 +288,6 @@ def safe_fetch_url(url):
         raise ValueError("Only public HTTP/HTTPS URLs are supported.")
     if not host_is_public(parsed.hostname):
         raise ValueError("Private/local network addresses are blocked.")
-    # Redirects are disabled to prevent redirect-based SSRF.
     r = HTTP.get(url, timeout=20, allow_redirects=False, stream=True)
     r.raise_for_status()
     ctype = r.headers.get("Content-Type", "").lower()
@@ -308,7 +304,6 @@ def safe_fetch_url(url):
     return f"Title: {title}\nURL: {url}\nContent:\n{text[:14000]}"
 
 def web_search(query, limit=5):
-    # DuckDuckGo HTML endpoint: no API key. Search may be rate-limited or unavailable.
     from urllib.parse import quote_plus
     r = HTTP.get("https://html.duckduckgo.com/html/",
                  params={"q": query}, timeout=20)
@@ -394,16 +389,21 @@ with st.sidebar:
     st.divider()
     st.subheader("API credentials")
     st.caption("Secrets are loaded automatically. Manual entries last only for this session.")
+    
+    # FIXED: Removed type="password" from st.text_area
     st.text_area("Gemini keys (one per line)", key="gemini_keys",
-                 value=str(secret("GEMINI_KEYS", secret("GEMINI_API_KEY", ""))), type="password")
+                 value=str(secret("GEMINI_KEYS", secret("GEMINI_API_KEY", ""))))
     st.text_area("Groq keys (one per line)", key="groq_keys",
-                 value=str(secret("GROQ_KEYS", secret("GROQ_API_KEY", ""))), type="password")
+                 value=str(secret("GROQ_KEYS", secret("GROQ_API_KEY", ""))))
     st.text_area("OpenRouter keys (one per line)", key="openrouter_keys",
-                 value=str(secret("OPENROUTER_KEYS", secret("OPENROUTER_API_KEY", ""))), type="password")
+                 value=str(secret("OPENROUTER_KEYS", secret("OPENROUTER_API_KEY", ""))))
+    
     st.text_input("Cloudflare API token", key="cloudflare_token",
                   value=str(secret("CLOUDFLARE_API_TOKEN", "")), type="password")
+                  
     st.text_area("Mistral keys (one per line)", key="mistral_keys",
-                 value=str(secret("MISTRAL_API_KEYS", secret("MISTRAL_API_KEY", ""))), type="password")
+                 value=str(secret("MISTRAL_API_KEYS", secret("MISTRAL_API_KEY", ""))))
+                 
     st.caption("Cloudflare also requires CLOUDFLARE_ACCOUNT_ID in Secrets.")
     with st.expander("Model preferences"):
         st.text_input("Gemini model", key="gemini_model", value="gemini-2.5-flash")
@@ -447,14 +447,14 @@ with st.expander("What can JARVIS do?"):
 Some sites block scraping, some videos have no captions, and free provider quotas are limited.
 """)
 
-# Display history (do not expose uploaded file bytes in history)
+# Display history
 for msg in chat_history():
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         if msg.get("provider"):
             st.caption(f"⚡ {msg['provider']}")
 
-# File uploader remains part of the single chat workflow.
+# File uploader
 upload = st.file_uploader(
     "Attach a file or image (optional)",
     type=["pdf", "docx", "txt", "md", "py", "json", "csv", "xlsx", "png", "jpg", "jpeg", "webp"],
@@ -519,7 +519,7 @@ if prompt:
                     context_blocks.append(safe_fetch_url(urls[0].rstrip(".,);]")))
                 except Exception as e:
                     context_blocks.append(f"Website retrieval failed: {safe_error(e)}. Do not claim to have read it.")
-            # Explicit search intent or request for current facts triggers search.
+            # Explicit search intent triggers search.
             search_intent = bool(re.search(
                 r"\b(search|research|latest|current|today|news|look up|find sources|web search|খুঁজে|সার্চ|সাম্প্রতিক|আজকের)\b",
                 prompt, re.I
