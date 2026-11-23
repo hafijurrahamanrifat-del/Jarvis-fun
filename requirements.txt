@@ -1,0 +1,15 @@
+streamlit
+requests
+pypdf
+fpdf2
+edge-tts
+moviepy
+pillow
+huggingface_hub
+streamlit-mic-recorder
+pandas
+duckduckgo-search
+beautifulsoup4
+youtube-transcript-api
+groq
+google-generativeai
