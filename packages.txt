@@ -1,2 +1,1 @@
-ffmpeg
-fonts-noto-core
+# No OS-level packages required for the base app.
