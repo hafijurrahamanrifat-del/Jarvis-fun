@@ -7,6 +7,7 @@ Pillow
 pandas
 beautifulsoup4
 youtube-transcript-api
+youtube-transcript-unblocked
 groq
 google-genai
 streamlit-mic-recorder
@@ -15,3 +16,4 @@ numpy
 imageio
 imageio-ffmpeg
 qrcode
+
