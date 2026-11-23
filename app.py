@@ -38,27 +38,41 @@ def init_db():
     conn.close()
 init_db()
 
-# --- MULTI-API ROUTER & KEY ROTATION ---
+# --- MULTI-API ROUTER (LATEST FREE MODELS) ---
 def call_ai_with_fallback(prompt, openrouter_keys, groq_keys, gemini_keys):
-    # 1. Try OpenRouter
+    error_log = []
+    
+    # 1. Try OpenRouter (Auto Router & Latest Free Models)
     if openrouter_keys:
         keys = [k.strip() for k in openrouter_keys.split('\n') if k.strip()]
-        models = ["google/gemini-2.0-flash-exp:free", "meta-llama/llama-3.3-70b-instruct:free"]
+        models = [
+            "openrouter/free", # Auto-router (সবচেয়ে ভালো ফ্রি মডেল বেছে নেবে)
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "google/gemini-2.0-flash-exp:free",
+            "microsoft/phi-3-mini-128k-instruct:free"
+        ]
         for key in keys:
             for model in models:
                 try:
                     res = requests.post(
                         url="https://openrouter.ai/api/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                        headers={
+                            "Authorization": f"Bearer {key}", 
+                            "HTTP-Referer": "https://streamlit.io",
+                            "X-Title": "JARVIS",
+                            "Content-Type": "application/json"
+                        },
                         json={"model": model, "messages": [{"role": "user", "content": prompt}]},
-                        timeout=15
+                        timeout=20
                     )
                     if res.status_code == 200:
                         return res.json()['choices'][0]['message']['content'], f"OpenRouter ({model.split('/')[-1]})"
-                except:
-                    continue
+                    else:
+                        error_log.append(f"OR: {res.status_code}")
+                except Exception as e:
+                    error_log.append(f"OR: {str(e)[:20]}")
 
-    # 2. Try Groq
+    # 2. Try Groq (Latest Models)
     if groq_keys:
         g_keys = [k.strip() for k in groq_keys.split('\n') if k.strip()]
         for gk in g_keys:
@@ -66,13 +80,23 @@ def call_ai_with_fallback(prompt, openrouter_keys, groq_keys, gemini_keys):
                 client = Groq(api_key=gk)
                 chat_completion = client.chat.completions.create(
                     messages=[{"role": "user", "content": prompt}],
-                    model="llama3-8b-8192",
+                    model="llama-3.1-8b-instant", # আপডেটেড মডেল
                 )
-                return chat_completion.choices[0].message.content, "Groq (Llama3)"
-            except:
-                continue
+                return chat_completion.choices[0].message.content, "Groq (Llama 3.1)"
+            except Exception as e:
+                error_log.append(f"GQ: {str(e)[:20]}")
+            
+            try:
+                client = Groq(api_key=gk)
+                chat_completion = client.chat.completions.create(
+                    messages=[{"role": "user", "content": prompt}],
+                    model="gemma2-9b-it", # ব্যাকআপ মডেল
+                )
+                return chat_completion.choices[0].message.content, "Groq (Gemma 2)"
+            except Exception as e:
+                error_log.append(f"GQ2: {str(e)[:20]}")
 
-    # 3. Try Gemini
+    # 3. Try Gemini (Latest Models)
     if gemini_keys:
         gem_keys = [k.strip() for k in gemini_keys.split('\n') if k.strip()]
         for gem_k in gem_keys:
@@ -80,11 +104,19 @@ def call_ai_with_fallback(prompt, openrouter_keys, groq_keys, gemini_keys):
                 genai.configure(api_key=gem_k)
                 model = genai.GenerativeModel('gemini-1.5-flash')
                 response = model.generate_content(prompt)
-                return response.text, "Google Gemini"
-            except:
-                continue
+                return response.text, "Google Gemini 1.5 Flash"
+            except Exception as e:
+                error_log.append(f"GM: {str(e)[:20]}")
+            
+            try:
+                genai.configure(api_key=gem_k)
+                model = genai.GenerativeModel('gemini-1.5-pro')
+                response = model.generate_content(prompt)
+                return response.text, "Google Gemini 1.5 Pro"
+            except Exception as e:
+                error_log.append(f"GM2: {str(e)[:20]}")
 
-    return "স্যার, দুঃখিত। বর্তমানে সমস্ত এআই সার্ভার ব্যস্ত বা লিমিট শেষ। আমি লোকাল মোডে কাজ করছি।", "Offline"
+    return f"স্যার, সমস্ত এআই সার্ভার ব্যস্ত বা লিমিট শেষ। Error Details: {str(error_log[:2])}", "Offline"
 
 # --- SIDEBAR & SECURITY ---
 with st.sidebar:
@@ -131,7 +163,7 @@ with tabs[0]:
         except:
             st.write("News unavailable.")
 
-# --- TAB 2: SUPER CHAT ---
+# --- TAB 2: SUPER CHAT (Text + Voice) ---
 with tabs[1]:
     st.header("Chat with JARVIS")
     if "messages" not in st.session_state:
@@ -141,6 +173,45 @@ with tabs[1]:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
+    # Voice Input Module
+    st.subheader("🎤 Voice Input (Groq Whisper)")
+    audio = mic_recorder(start_prompt="Start Recording", stop_prompt="Stop Recording", just_once=True)
+    
+    if audio:
+        with st.spinner("Transcribing voice..."):
+            try:
+                with open("temp_audio.wav", "wb") as f:
+                    f.write(audio['bytes'])
+                
+                if groq_keys:
+                    gk = [k.strip() for k in groq_keys.split('\n') if k.strip()][0]
+                    client = Groq(api_key=gk)
+                    with open("temp_audio.wav", "rb") as file:
+                        transcription = client.audio.transcriptions.create(
+                            file=(file.name, file.read()),
+                            model="whisper-large-v3-turbo",
+                        )
+                    prompt = transcription.text
+                    st.success(f"Transcribed: {prompt}")
+                    
+                    st.session_state.messages.append({"role": "user", "content": prompt})
+                    with st.chat_message("user"):
+                        st.markdown(prompt)
+                    with st.chat_message("assistant"):
+                        with st.spinner("Thinking..."):
+                            response, provider = call_ai_with_fallback(prompt, openrouter_keys, groq_keys, gemini_keys)
+                            st.markdown(response)
+                            st.caption(f"Powered by: {provider}")
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+                else:
+                    st.error("Groq API Key needed for Voice Input.")
+                
+                if os.path.exists("temp_audio.wav"):
+                    os.remove("temp_audio.wav")
+            except Exception as e:
+                st.error(f"Voice Error: {e}")
+
+    # Text Chat Input
     if prompt := st.chat_input("Ask JARVIS anything..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -152,27 +223,6 @@ with tabs[1]:
                 st.markdown(response)
                 st.caption(f"Powered by: {provider}")
         st.session_state.messages.append({"role": "assistant", "content": response})
-
-    st.divider()
-    st.header("♻️ YouTube Content Repurposer")
-    yt_url = st.text_input("Enter YouTube URL:")
-    if st.button("Repurpose Video"):
-        if yt_url:
-            with st.spinner("Extracting transcript..."):
-                try:
-                    if "v=" in yt_url:
-                        video_id = yt_url.split("v=")[1].split("&")[0]
-                    else:
-                        video_id = yt_url.split("/")[-1]
-                    
-                    transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-                    transcript = " ".join([t['text'] for t in transcript_list])
-                    
-                    prompt = f"Based on this transcript, generate 5 TikTok scripts, 10 Tweets, and 1 LinkedIn post:\n\n{transcript[:2000]}"
-                    res, _ = call_ai_with_fallback(prompt, openrouter_keys, groq_keys, gemini_keys)
-                    st.write(res)
-                except Exception as e:
-                    st.error("Could not fetch transcript. Video might not have captions.")
 
 # --- TAB 3: FREELANCE ---
 with tabs[2]:
@@ -232,7 +282,7 @@ with tabs[5]:
 # --- TAB 7: VIDEO ---
 with tabs[6]:
     st.header("🎬 Video Studio")
-    st.warning("স্যার, ফ্রি সার্ভারে ভিডিও রেন্ডার করতে অনেক সময় লাগে বা ক্র্যাশ করে।")
+    st.warning("স্যার, ফ্রি সার্ভারে ভিডিও রেন্ডার করতে অনেক সময় লাগে বা ক্র্যাশ করে। তাই এটি Safe Mode-এ আছে।")
     uploaded_images = st.file_uploader("Upload Scene Images", accept_multiple_files=True)
     if st.button("Render Video"):
         if uploaded_images:
