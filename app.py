@@ -20,6 +20,7 @@ import requests
 import streamlit as st
 from streamlit_mic_recorder import mic_recorder
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_unblocked import YouTubeTranscriptApi
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="JARVIS Ultimate", page_icon="🤖", layout="wide")
@@ -971,3 +972,4 @@ with tabs[8]:
           file_name="jarvis_backup.db",
           mime="application/octet-stream",
       )
+
