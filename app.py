@@ -64,7 +64,7 @@ try:
 except Exception:
     FPDF = None
 
-APP_VERSION = "5.0.0 Ultra"
+APP_VERSION = "5.0.1 Ultra"
 HTTP = requests.Session()
 HTTP.headers.update({"User-Agent": "JARVIS-Ultimate/5.0"})
 TIMEOUT = 90
@@ -785,9 +785,12 @@ def main():
         st.divider()
         st.subheader("🔑 API keys (optional)")
         st.caption("All optional — Pollinations works with no key. Multiple keys (comma/newline) rotate automatically.")
-        st.text_area("OpenRouter keys", key="box_OPENROUTER_KEYS", type="password", height=68)
-        st.text_area("Groq keys", key="box_GROQ_KEYS", type="password", height=68)
-        st.text_area("Gemini keys", key="box_GEMINI_KEYS", type="password", height=68)
+        st.text_input("OpenRouter keys", key="box_OPENROUTER_KEYS", type="password",
+                      placeholder="sk-or-v1-…, sk-or-v1-… (comma-separated)")
+        st.text_input("Groq keys", key="box_GROQ_KEYS", type="password",
+                      placeholder="gsk_…, gsk_… (comma-separated)")
+        st.text_input("Gemini keys", key="box_GEMINI_KEYS", type="password",
+                      placeholder="AIza…, AIza… (comma-separated)")
         with st.expander("🔌 Providers & honest limits"):
             st.markdown("🟢 **Pollinations** — free, NO key (default brain + images + video scenes)")
             st.markdown(f"{'🟢' if keys_from(secret('GROQ_KEYS')) else '⚪'} **Groq** — free key: console.groq.com")
