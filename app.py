@@ -142,7 +142,7 @@ def call_ai(messages, image_parts=None):
     # 1. OpenRouter (DeepSeek, Gemini, Llama)
     or_keys = keys_from(secret("OPENROUTER_KEYS", ""))
     if or_keys:
-        models = ["deepseek/deepseek-r1:free", "google/gemini-2.0-flash-exp:free", "meta-llama/llama-3.3-70b-instruct:free"]
+        models = ["deepseek/deepseek-r1:free", "google/gemini-2.5-pro-exp:free", "meta-llama/llama-3.3-70b-instruct:free"]
         for key in or_keys:
             for model in models:
                 try:
